@@ -21,7 +21,7 @@
 </p>
 
 
-## v3 is now available
+## v3 is now available (Now with AI features)
 
 The new version should be *much* faster and fix a lot of bugs. It also comes with
 a some new actions, filters and options.
