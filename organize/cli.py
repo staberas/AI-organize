@@ -6,6 +6,7 @@ Usage:
   organize sim    [options] [<config> | --stdin]
   organize new    [<config>]
   organize edit   [<config>]
+  organize aiedit [<request>]
   organize check  [<config> | --stdin]
   organize debug  [<config> | --stdin]
   organize show   [--path|--reveal] [<config>]
@@ -19,6 +20,7 @@ Commands:
   sim        Simulate organizing your files.
   new        Creates a default config.
   edit       Edit the config file with $EDITOR
+  aiedit     AI will generate and edit the config file based on your request
   check      Check config file validity
   debug      Shows the raw config parsing steps.
   show       Print the config to stdout.
@@ -41,6 +43,7 @@ Options:
 import os
 import sys
 from functools import partial
+from openai import OpenAI
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Set, Union
 
@@ -167,6 +170,90 @@ def edit(config: Optional[str]) -> None:
     else:
         _open_uri(config_path.as_uri())
 
+def aiedit(request: str) -> None:
+    # Point to the local server
+    client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
+
+    completion = client.chat.completions.create(
+      model="model-identifier",
+      messages=[
+        {"role": "system", "content": "You are a template generator. You take the user's natural language input and print out a template based on the following structure: \n\n"
+                                      "```yaml\n"
+                                      "rules:\n"
+                                      "  - name: \"Rule Name\"  # Descriptive name of the rule\n"
+                                      "    locations:\n"
+                                      "      - \"path/to/location\"  # Paths to the directories to be monitored\n"
+                                      "      - \"another/path/to/location\"\n"
+                                      "    subfolders: true  # Whether to include subfolders\n\n"
+                                      "    # Filters Section\n"
+                                      "    filters:\n"
+                                      "      - extension:\n"
+                                      "          - \".txt\"  # File extensions to filter\n"
+                                      "          - \".pdf\"\n"
+                                      "      - filename:\n"
+                                      "          startswith: \"prefix_\"  # Files starting with this prefix\n"
+                                      "          endswith: \"_suffix\"  # Files ending with this suffix\n"
+                                      "          contains: \"substring\"  # Files containing this substring\n"
+                                      "          regex: \"pattern\"  # Regex pattern to match filenames\n"
+                                      "      - filesize:\n"
+                                      "          min: 1024  # Minimum file size in bytes\n"
+                                      "          max: 1048576  # Maximum file size in bytes\n"
+                                      "      - lastmodified:\n"
+                                      "          before: \"2024-01-01\"  # Files modified before this date\n"
+                                      "          after: \"2023-01-01\"  # Files modified after this date\n"
+                                      "      - created:\n"
+                                      "          before: \"2024-01-01\"  # Files created before this date\n"
+                                      "          after: \"2023-01-01\"  # Files created after this date\n"
+                                      "      - filecontent:\n"
+                                      "          contains: \"specific text\"  # Files containing specific text\n"
+                                      "          regex: \"pattern\"  # Regex pattern to match file content\n"
+                                      "      - mtime:\n"
+                                      "          days: 30  # Files modified in the last 30 days\n"
+                                      "      - exif:\n"
+                                      "          datetimeoriginal: \"2024:01:01 00:00:00\"  # Filter by EXIF datetime\n"
+                                      "      - mtime:\n"
+                                      "          days: 30  # Files modified in the last 30 days\n\n"
+                                      "    # Actions Section\n"
+                                      "    actions:\n"
+                                      "      - move: \"path/to/destination\"  # Move files to this location\n"
+                                      "      - copy: \"path/to/destination\"  # Copy files to this location\n"
+                                      "      - delete: true  # Delete the files\n"
+                                      "      - shell: \"command to run\"  # Run a shell command\n"
+                                      "      - rename:\n"
+                                      "          name: \"new_name\"  # Rename the files\n"
+                                      "          overwrite: false  # Whether to overwrite existing files\n"
+                                      "      - echo: \"Message to log\"  # Log a message\n"
+                                      "      - settag:\n"
+                                      "          - \"tag1\"  # Set tags for files\n"
+                                      "          - \"tag2\"\n"
+                                      "      - settags:  # Use if you want to replace all tags\n"
+                                      "          - \"newtag1\"\n"
+                                      "          - \"newtag2\"\n"
+                                      "      - cleartags: true  # Clear all tags\n"
+                                      "      - script: \"path/to/script.py\"  # Run a custom script\n\n"
+                                      "  # Example Rule\n"
+                                      "  rules:\n"
+                                      "  - name: \"Example Rule\"\n"
+                                      "    locations:\n"
+                                      "      - \"~/Downloads\"\n"
+                                      "    subfolders: true\n"
+                                      "    filters:\n"
+                                      "      - extension:\n"
+                                      "          - \".jpg\"\n"
+                                      "          - \".png\"\n"
+                                      "      - filesize:\n"
+                                      "          min: 1024\n"
+                                      "          max: 1048576\n"
+                                      "    actions:\n"
+                                      "      - move: \"~/Pictures\"\n"
+                                      "      - echo: \"Images have been moved to Pictures\"\n"
+                                      "```\n\n"
+                                      "Please provide the appropriate template without any commentary just the yaml"},
+        {"role": "user", "content": request}
+    ],
+      temperature=0.7,
+    )
+    print(completion.choices[0].message)
 
 def check(config: ConfigWithPath) -> None:
     Config.from_string(config=config.config, config_path=config.config_path)
@@ -217,6 +304,7 @@ class CliArgs(BaseModel):
     show: bool
     list: bool
     docs: bool
+    aiedit: bool  # Add this line
 
     # run / sim options
     config: Optional[str] = Field(..., alias="<config>")
@@ -225,6 +313,8 @@ class CliArgs(BaseModel):
     tags: Optional[str] = Field(..., alias="--tags")
     skip_tags: Optional[str] = Field(..., alias="--skip-tags")
     stdin: bool = Field(..., alias="--stdin")
+
+    request: Optional[str] = Field(None, alias="<request>")  # Add this line
 
     # show options
     path: bool = Field(False, alias="--path")
@@ -285,6 +375,8 @@ def cli(argv: Union[list[str], str, None] = None) -> None:
             edit(config=args.config)
         elif args.check:
             check(config=_config_with_path())
+        elif args.aiedit:  # Add this block
+            aiedit(request=args.request)
         elif args.debug:
             debug(config=_config_with_path())
         elif args.show:
