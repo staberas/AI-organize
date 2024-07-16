@@ -23,6 +23,8 @@
 
 ## v3 is now available (Now with AI features)
 
+Note: This AI powered version requires to have LMstudio or other compatible local LLM api.
+
 The new version should be *much* faster and fix a lot of bugs. It also comes with
 a some new actions, filters and options.
 
@@ -216,6 +218,7 @@ Usage:
   organize sim   [options] [<config>]
   organize new   [<config>]
   organize edit  [<config>]
+  organize aiedit  [<your input>]
   organize check [<config>]
   organize debug [<config>]
   organize show  [--path|--reveal] [<config>]
@@ -229,6 +232,7 @@ Commands:
   sim        Simulate organizing your files.
   new        Creates a new config.
   edit       Edit the config file with $EDITOR.
+  aiedit     AI yalm generator , just type your request 
   check      Check whether the config file is valid.
   debug      Shows the raw config parsing steps.
   show       Print the config to stdout.
