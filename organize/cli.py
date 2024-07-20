@@ -42,6 +42,7 @@ Options:
 """
 import os
 import sys
+import tempfile 
 from functools import partial
 from openai import OpenAI
 from pathlib import Path
@@ -170,7 +171,7 @@ def edit(config: Optional[str]) -> None:
     else:
         _open_uri(config_path.as_uri())
 
-def aiedit(request: str) -> None:
+def aiedit(request: str, config: Optional[str]) -> None:
     # Point to the local server
     client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
 
@@ -218,7 +219,7 @@ def aiedit(request: str) -> None:
                                       "      - move: \"path/to/destination\"  # Move files to this location\n"
                                       "      - copy: \"path/to/destination\"  # Copy files to this location\n"
                                       "      - delete: true  # Delete the files\n"
-                                      "      - shell: \"command to run\"  # Run a shell command\n"
+                                      "      - shell: \"python command to run\"  # Run a python shell command\n"
                                       "      - rename:\n"
                                       "          name: \"new_name\"  # Rename the files\n"
                                       "          overwrite: false  # Whether to overwrite existing files\n"
@@ -253,7 +254,25 @@ def aiedit(request: str) -> None:
     ],
       temperature=0.7,
     )
-    print(completion.choices[0].message)
+    print(completion.choices[0].message.content)
+    
+    yaml_content = completion.choices[0].message.content
+
+    # Create a temporary file with the YAML content
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w", encoding="utf-8") as tmp_file:
+        tmp_file.write(yaml_content)
+        tmp_file_path = tmp_file.name
+        print("Result saved: ",tmp_file_path)
+
+    config_path = find_config(config)
+    # Open the temporary file in the editor
+    editor = os.getenv("EDITOR")  # Use 'notepad' as default editor if EDITOR is not set
+    if editor:
+        os.system(f'{editor} "{tmp_file_path}"')
+    else:
+        _open_uri(Path(tmp_file_path).as_uri())
+
+
 
 def check(config: ConfigWithPath) -> None:
     Config.from_string(config=config.config, config_path=config.config_path)
@@ -376,7 +395,7 @@ def cli(argv: Union[list[str], str, None] = None) -> None:
         elif args.check:
             check(config=_config_with_path())
         elif args.aiedit:  # Add this block
-            aiedit(request=args.request)
+            aiedit(request=args.request, config=args.config)
         elif args.debug:
             debug(config=_config_with_path())
         elif args.show:
